@@ -1,6 +1,7 @@
 
 /**
  * calculates the L2 (euclidean) distance of two arrays
+ *
  * @param x {Array} some numbers
  * @param y {Array} some numbers
  * @returns {Number} L2 distance
@@ -39,6 +40,7 @@ function l2Distance(x, y) {
 
 /**
  * calculates the L1 (manhattan) distance of two arrays
+ *
  * @param x {Array} some numbers
  * @param y {Array} some numbers
  * @returns {Number} L1 distance

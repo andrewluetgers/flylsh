@@ -1,0 +1,16 @@
+{
+  "name": "flylsh",
+  "version": "1.0.0",
+  "description": "Implementation of \"A neural algorithm for a fundamental computing problem\" (2017) based on original implementatio provided by provided by Saket Navlakha",
+  "main": "src/flylsh.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "author": "Andrew Luetgers <andrew.luetgers@gmail.com> (http://www.andrewluetgers.com/)",
+  "license": "ISC",
+  "dependencies": {},
+  "devDependencies": {
+    "assert": "^1.4.1",
+    "mocha": "^4.0.1"
+  }
+}

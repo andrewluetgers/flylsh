@@ -1,3 +1,4 @@
+
 // from https://www.filosophy.org/post/35/normaldistributed_random_values_in_javascript_using_the_ziggurat_algorithm/
 function Ziggurat() {
 	
@@ -105,11 +106,4 @@ function Ziggurat() {
 	}
 }
 
-function getNormRandZiggurat(seed) {
-	let z = new Ziggurat();
-	z.init(seed);
-	
-	return z.nextGaussian;
-}
-
-module.exports = getNormRandZiggurat;
+module.exports = Ziggurat;
