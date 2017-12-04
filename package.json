@@ -8,7 +8,10 @@
   },
   "author": "Andrew Luetgers <andrew.luetgers@gmail.com> (http://www.andrewluetgers.com/)",
   "license": "ISC",
-  "dependencies": {},
+  "dependencies": {
+    "node-ziggurat": "github:andrewluetgers/node-ziggurat",
+    "quickselect": "^1.0.0"
+  },
   "devDependencies": {
     "assert": "^1.4.1",
     "mocha": "^4.0.1"

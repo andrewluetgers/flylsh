@@ -1,20 +1,20 @@
 
+let Ziggurat =      require('node-ziggurat'),
+	quickselect =   require('quickselect'),
+	m =             require('./utils/matrixUtils');
 
-// setupRandom numbers
-let Ziggurat = require('./utils/ziggurat'),
-	m = require('./utils/matrixUtils');
 
-
+// setup how random numbers are generated, algorithm calls for
+// normally distributed Ziggurat is the fastest impl I can find
+// see https://github.com/andrewluetgers/nRandTest
 let rand;
-function setSeed(randomSeed) {
-	let seed = randomSeed || (new Date().getTime()),
-		z = new Ziggurat();
-	
-	z.init(seed);
+function setSeed(seed) {
+	let z = new Ziggurat(seed);
 	rand = z.nextGaussian;
+	return rand;
 }
 
-setSeed();
+setSeed(); // uses timestamp by default
 
 
 /**
@@ -104,76 +104,247 @@ function normalizeColumnMins(matrix, targetMin) {
 function normalizeRowMeans(matrix, targetMean) {
 	targetMean = (typeof targetMean === "number") ? targetMean : 100;
 	
-	// zerofix if targetMean is 0
-	// so that we don't zero-out all values set the mean to 1
-	// then subtract 1 after multiplying
-	let zeroFix = targetMean === 0 ? 1 : 0;
-	targetMean = targetMean || 1;
+	let rows = matrix.length,
+		cols = matrix[0].length;
 	
-	return matrix.map(row => {
-		let sum = row.reduce((p,c) => p + c),
-			mean = sum / row.length,
-			mult = mean && targetMean/mean;
-		
-		return row.map(col => {
-			let val = mean
-				? col*mult
-				: col+targetMean; // handle edge case mean = 0
-			
-			return val-zeroFix;
-		});
-	});
-}
-
-
-/**
- * modifies the given matrix by:
- * 1) normalizing columns to positive values or targetMin
- * 2) centering row means to 100 or targetMean
- *
- * @param matrix {Array} 2d array of numbers
- * @param targetMin {Number} optional defaults to 0
- * @param targetMean {Number} optional defaults to 100
- * @returns {Array} the normalized matrix
- */
-function normalizeMatrix(matrix, targetMin, targetMean) {
-	// normalize to positive values
-	normalizeColumnMins(matrix, targetMin);
-	// center the means to targetMean
-	return normalizeRowMeans(matrix, targetMean);
-}
-
-
-/**
- * produces a new 2D random matrix as specified below
- *
- * @param rows {Number} corresponds to number of kenyan cells in algorithm
- * @param cols {Number} corresponds to number of dimensions in data
- * @param samples {Number} (optional) see description below
- * @returns 2d array of cols width and rows height
- *
- * if samples is given a sparse binary matrix is returned
- * where samples = number of random 1s per row
- *
- * if samples is not given a dense gaussian matrix is returned
- * where values are gaussian, positive, with row means at 100
- */
-function randomMatrix(rows, cols, samples) {
-	if (samples) {
-		// sparse binary random matrix
-		return binaryRandomMatrix(rows, cols, samples);
-	} else {
-		// dense gaussian random matrix
-		return normalizeMatrix(m.matrix(rows, cols, rand));
+	if (targetMean <= 0) {
+		throw new Error("positive number expected");
 	}
+	
+	for (let r=0; r<rows; r++) {
+		let row = matrix[r],
+			sum = row.reduce((p,c) => p + c),
+			mean = sum / cols,
+			mult = mean ? targetMean/mean : 1;
+		
+		// hot code, avoiding iterator function call overhead of array methods
+		if (!sum && !mean) {
+			for (let c=0; c<cols; c++) {row[c] = row[c]+targetMean}
+		} else {
+			for (let c=0; c<cols; c++) {row[c] = row[c]*mult}
+		}
+	}
+}
+
+/**
+ * modifies given data in-place!!
+ *
+ * @param data {Array} 2D array of numbers
+ * @returns {Array}
+ */
+function normalize(data) {
+	// normalize to positive values
+	normalizeColumnMins(data, 0);
+	
+	// center the means to targetMean
+	normalizeRowMeans(data, 100);
+}
+
+// return a completed set of options
+// uses defaults for those not given
+function getOpts(opts={}) {
+	
+
+	
+	let o = {
+		debug:          opts.debug          || false,
+		reps:           opts.reps           || 50,
+		kCells:         opts.kCells         || 50,
+		samples:        opts.samples        || undefined,
+		bucketWidth:    opts.bucketWidth    || 10,
+		hashLength:     opts.hashLength     || 16,
+		tagType:        opts.tagType        || "top"
+	};
+	
+	if (o.tagType === "all") {
+		o.hashLength = o.kCells;
+	}
+	
+	return o;
+}
+
+/**
+ * flylsh implementation
+ *
+ * @param data {Array} 2D matrix of numbers
+ * @param opts {Object} optional
+ *   debug           turns on logging                               (default=false)
+ *   kCells          number of Kenyon cells                         (default=50)
+ *   bucketWidth     modifies the quantization process              (default=10)
+ *   hashLength      number of returned values per row              (default=1r)
+ *   tagType         winner-take-all method all|top|bottom|random   (default="top")
+ *   samples         set for sparse binary projection type          (default=undefined)
+ *                   recommended value = data dimensions/10
+ *                   default value = traditional LSH behavior
+ *
+ * ------------------------------------------------------------------------------------
+ * all quotations and details from https://doi.org/10.1101/180471
+ * ------------------------------------------------------------------------------------
+ *
+ * Fly Olfactory Model and Terminology:
+ *
+ * input data corresponds to scents
+ * each data column corresponds a specific odorant receptor neuron (ORN) type
+ * thus a row represents the total ORN response to a given scent
+ **
+ * ORNs connect to projection neurons (PNs) in structures called glomeruli
+ * this is a feed-forward / 1-to-1 mapping
+ * in this code data columns (cols), dimensions, ORNs, and PNs are equivalent
+ *
+ * PNs project randomly to the Kenyon cells (KCs) https://en.wikipedia.org/wiki/Kenyon_cell
+ * there are many more Kenyon cells than PNs
+ *
+ * "40-fold expansion in the number of neurons 50 PNs project to 2000 Kenyon cells (KCs),
+ * connected by a sparse, binary random connection matrix (14). Each Kenyon cell
+ * receives and sums the firing rates from about 6 randomly selected PNs"
+ *
+ * the above quote would look like the following
+ * input data would have 50 columns/dimensions
+ *
+ * hash(data, {kCells: 2000, samples: 6})
+ *
+ *
+ * Basic Steps:
+ *
+ * ------ step 1 normalize ------
+ * input data is normalized:
+ *  1 columns are shifted to have positive values
+ *  2 row values are scaled so that all rows share the same mean
+ *    see https://en.wikipedia.org/wiki/Normalization_model
+ *
+ * ------ step 2 project ------
+ * large expansion of neurons (a signature feature of the fly algorithm)
+ *
+ * ------ step 3 winner take all ------
+ * "a winner-take-all circuit using strong inhibitory feedback from a single
+ * inhibitory neuron, called APL. As a result, all but the highest firing 5% of
+ * Kenyon cells are silenced (3, 5, 6, 15). The firing rates of the remaining 5%
+ * corresponds to the tag assigned to the input odor."
+ *
+ * ------------------------------------------------------------------------------------
+ *
+ * Discussion:
+ * "three differences between the fly’s algorithm versus conventional LSH algorithms.
+ *
+ * First, the fly uses sparse, binary random projections,
+ * whereas LSH functions typically use dense, i.i.d. Gaussian random projections
+ * that are much more expensive to compute.
+ *
+ * Second, the fly expands the dimensionality of the input after projection (d ≪ m),
+ * whereas LSH contracts the dimension (d ≫ m).
+ *
+ * Third, the fly sparsifies the higher-dimensionality representation
+ * using a winner-take-all (WTA) mechanism,
+ * whereas LSH preserves a dense representation."
+ *
+ * ------------------------------------------------------------------------------------
+ *
+ * Examples for Figure 3:
+ *
+ * Fly example:
+ * Sparse, binary random projection where each Kenyon cell
+ * samples 12 inputs, with 1280 Kenyon cells, selecting the
+ * top 16 firing neurons for the hash length, evaluated on
+ * e.g. hash(data, {samples: 12, kCells: 1280, hashLength: 16, tagType: "top"})
+ *
+ * LSH example:
+ * Dense, Gaussian random projection with a hash length of 16
+ * e.g. hash(data, {kCells: 16, hashLength: 16, tagType: "all"})
+ */
+
+function hash(data, opts) {
+	
+	let d = data || [[]],
+		o = getOpts(opts),
+		rows = d.length,        // rows of data
+		cols = d[0].length,     // columns in data (dimensions)
+		matrix,                 // the random projection matrix
+		product,                // the computed Kenyon cell activity
+		hashVals;               // hash values for provided data
+	
+	if (rows < 10) {throw new Error('Minimum of 10 rows required')}
+	
+	
+	// ------------ step 1 normalize ------------
+	normalize(d);
+	//console.log("normalized", d[0]);
+	
+	
+	// ------------ step 2 project ------------
+	// create random projection matrix of size Kenyon cells by ORNS.
+	if (o.samples) {
+		// sparse binary random matrix (FLY)
+		matrix = binaryRandomMatrix(o.kCells, cols, o.samples);
+	} else {
+		// dense gaussian random matrix (LSH)
+		matrix = m.matrix(o.kCells, cols, rand);
+	}
+	
+	//console.log("matrix", matrix);
+	//console.log("transpose", m.transpose(matrix));
+	
+	// compute KC firing activity
+	// todo this is busticated, see evaluate.js
+	product = m.dot(d, m.transpose(matrix));
+	
+	// "an additional quantization step is used for discretization"
+	//m.quantize(product, o.bucketWidth);
+	
+	console.log(product[0]);
+	
+	
+	// ------------ step 3 winner take all ------------
+	// start with 0s
+	hashVals = m.matrix(rows, o.kCells, ()=>0);
+	
+	// apply WTA to KCs: firing rates at indices corresponding to top/bot/rand/all KCs; 0s elsewhere.
+	if (o.tagType === "random") {
+		// fix indices for all odors, otherwise, can't compare.
+		randomIndices = randomSamples(o.hashLength, o.kCells);
+	}
+	
+	let index, indices, randomIndices;
+	for (let r=0; r<rows; r++) {
+		// winner take all
+		switch(o.tagType) {
+			case "all":
+				hashVals[r] = product[r];
+				break;
+				
+			case "random":
+				indices = randomIndices;
+				break;
+				
+			default:
+			case "top":
+				indices = Object.keys(product[r]);
+				quickselect(indices, o.hashLength, null, null, function(a ,b) {
+					let ai = arr[a], bi = arr[b];
+					return ai < bi ? -1 : ai > bi ? 1 : 0;
+				});
+				break;
+		}
+		
+		if (o.tagType !== "all") {
+			let hRow = hashVals[r],
+				pRow = product[r];
+			
+			for (let h=hashLength-1; h>=0; h--) {
+				index = indices[h];
+				hRow[index] = pRow[index];
+			}
+		}
+	}
+	
+	return hashVals;
 }
 
 
 module.exports = {
+	hash: hash,
 	setSeed: setSeed,
 	randomSamples: randomSamples,
 	binaryRandomMatrix: binaryRandomMatrix,
-	normalizeColumnMins: normalizeColumnMins,
 	normalizeRowMeans: normalizeRowMeans,
-	randomMatrix: randomMatrix
+	normalizeColumnMins: normalizeColumnMins
 };

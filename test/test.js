@@ -1,6 +1,8 @@
 
-let assert = require('assert'),
-	m = require('../src/utils/matrixUtils');
+let assert =    require('assert'),
+	distance =  require('../evaluate/distanceMetrics'),
+	flylsh =    require('../src/flylsh'),
+	m =         require('../src/utils/matrixUtils');
 
 
 describe("Matrix Utils", function() {
@@ -42,11 +44,31 @@ describe("Matrix Utils", function() {
 		});
 	});
 	
+	
+	describe("dot", function() {
+		it("computes a matrix dot product", function() {
+			let a = [[1,0], [0,1]],
+				b = [[4,1], [2,2]],
+				a2 = [[1,0], [0,1], [0,0], [1,1]],
+				b2 = [[4,1,3], [2,2,3]],
+				c2 = [[4,1], [2,2], [0,0], [6,3]];
+			
+			assert.deepEqual(m.dot(a, b), b);
+			assert.deepEqual(m.dot(a, b2), b2);
+			assert.deepEqual(m.dot(a2, b), c2);
+		});
+		
+		it("throws if shapes not aligned", function() {
+			let a = [[1, 0, 3], [0, 1, 3]],
+				b = [[4, 1], [2, 2]];
+			
+			assert.throws(()=> {m.dot(a, b)}, Error);
+		});
+	});
+	
 });
 
 
-
-let distance = require('../evaluate/distanceMetrics');
 
 describe("Distance Metrics", function() {
 	let v11 = [ 2, 4, 5, 3, 8, 2 ],
@@ -74,7 +96,7 @@ describe("Distance Metrics", function() {
 });
 
 
-let flylsh = require('../src/flylsh');
+
 
 describe("Fly LSH", function() {
 	
@@ -149,18 +171,35 @@ describe("Fly LSH", function() {
 	});
 	
 	describe("normalizeRowMeans", function() {
-		let mat = [[30,1,2],[2,1,0],[6,3,3]],
+		let mat = [[30,1,2],[2,1,0],[9,9,9]],
 			mat2 = [[8,5,4],[11,2,0],[0,0,0]]; // row of zeros is intentionally included here to test an edge case
 		
-		([100, 1000, 0, -1 ,1]).forEach(targetMean => {
+		([100, 1000, 1]).forEach(targetMean => {
 			it("should scale row values such that all row means = "+targetMean, function() {
-				let res = flylsh.normalizeRowMeans(mat, targetMean);
-				let res2 = flylsh.normalizeRowMeans(mat2, targetMean);
-				console.log(res, res2);
-				res.forEach(r => assert.equal(Math.round((r[0] + r[1] + r[2]) / 3), targetMean));
-				res2.forEach(r => assert.equal(Math.round((r[0] + r[1] + r[2]) / 3), targetMean));
+				flylsh.normalizeRowMeans(mat, targetMean);
+				flylsh.normalizeRowMeans(mat2, targetMean);
+				mat.forEach(r => assert.equal(Math.round((r[0] + r[1] + r[2]) / 3), targetMean));
+				mat2.forEach(r => assert.equal(Math.round((r[0] + r[1] + r[2]) / 3), targetMean));
+			});
+			
+			it("should throw for numbers <= 0", function() {
+				assert.throws(function() {flylsh.normalizeRowMeans(mat, 0)}, Error);
 			});
 		});
 	});
 	
+	
+	//describe("hash", function() {
+	//
+	//	let fs = require("fs");
+	//
+	//	it("should should hash data", function() {
+	//
+	//	});
+	//
+	//	//flylsh.hash();
+	//
+	//});
+	
+
 });

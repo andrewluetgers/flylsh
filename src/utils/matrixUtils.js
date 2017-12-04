@@ -32,6 +32,47 @@ function byColumn(matrix, fn) {
 	}
 }
 
+function dot(a, b) {
+	
+	console.log(b);
+	
+	let result = [];
+	
+	if (a[0].length !== b.length) {
+		throw new Error("Columns in a must equal rows in b");
+	}
+	
+	for (let i = 0; i < a.length; i++) {
+		result[i] = [];
+		
+		for (let j = 0; j < b[0].length; j++) {
+			let sum = 0;
+			
+			for (let k = 0; k < a[0].length; k++) {
+				sum += a[i][k] * b[k][j];
+			}
+			
+			result[i][j] = sum;
+			//console.log(result[i][j]);
+		}
+	}
+	return result;
+}
+
+/**
+ * modifies given matrix by
+ * dividing all values by buckets
+ * and flooring the value
+ *
+ * @param matrix {Array} 2D array of numbers
+ * @param width {Number} width of each bucket to quantize values into
+ */
+function quantize(matrix, width) {
+	byColumn(matrix, (r, c) => {
+		matrix[r][c] = Math.floor(matrix[r][c]/width);
+	});
+}
+
 /**
  * @param matrix {Array} 2D array to transpose
  * @returns {Array} a new transposed copy of input matrix
@@ -41,8 +82,13 @@ function transpose(matrix) {
 }
 
 module.exports = {
+	// generators
 	matrix: matrix,
+	dot: dot,
+	transpose: transpose,
+	
+	// modifiers
 	byColumn: byColumn,
-	transpose: transpose
+	quantize: quantize,
 };
 
