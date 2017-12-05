@@ -82,12 +82,16 @@ function normalizeColumnMins(matrix, targetMin) {
 	// set mins by column
 	m.byColumn(matrix, (r, c) => mins[c] = Math.min(mins[c]||Infinity, matrix[r][c]));
 	
+	//console.log("mins", mins);
 	// todo determine if option 2 is the best answer
 	
 	//option 1: raise everything by the same amount (same as original)
 	mins = mins.map(Math.abs);
-	m.byColumn(matrix, (r, c) => matrix[r][c] += (mins[c]+targetMin));
+	console.log("mins", mins);
+	console.log("matrix", matrix[0]);
+	m.byColumn(matrix, (r, c) => matrix[r][c] = (matrix[r][c]||0) + (mins[c]+targetMin));
 	
+	console.log("row 10", matrix[10]);
 	//option 2: raise or lower so all share the same min (seems more "normalized")
 	//m.byColumn(matrix, (r, c) => matrix[r][c] -= (mins[c]+targetMin));
 }
@@ -136,8 +140,10 @@ function normalize(data) {
 	// normalize to positive values
 	normalizeColumnMins(data, 0);
 	
+	
 	// center the means to targetMean
 	normalizeRowMeans(data, 100);
+	console.log("n2", data[0]);
 }
 
 // return a completed set of options
@@ -267,7 +273,7 @@ function hash(data, opts) {
 	
 	// ------------ step 1 normalize ------------
 	normalize(d);
-	//console.log("normalized", d[0]);
+	//console.log("normalized", rows, cols, d[20]);
 	
 	
 	// ------------ step 2 project ------------
@@ -279,19 +285,14 @@ function hash(data, opts) {
 		// dense gaussian random matrix (LSH)
 		matrix = m.matrix(o.kCells, cols, rand);
 	}
-	
-	//console.log("matrix", matrix);
-	//console.log("transpose", m.transpose(matrix));
-	
+
 	// compute KC firing activity
-	// todo this is busticated, see evaluate.js
-	product = m.dot(d, m.transpose(matrix));
+	product = m.multiply(d, matrix);
 	
 	// "an additional quantization step is used for discretization"
-	//m.quantize(product, o.bucketWidth);
+	m.quantize(product, o.bucketWidth);
 	
-	console.log(product[0]);
-	
+	console.log("quantized", product[10]);
 	
 	// ------------ step 3 winner take all ------------
 	// start with 0s
@@ -317,22 +318,35 @@ function hash(data, opts) {
 				
 			default:
 			case "top":
-				indices = Object.keys(product[r]);
-				quickselect(indices, o.hashLength, null, null, function(a ,b) {
-					let ai = arr[a], bi = arr[b];
-					return ai < bi ? -1 : ai > bi ? 1 : 0;
+				let row = product[r];
+				indices = Object.keys(row);
+				quickselect(indices, o.hashLength, null, null, function(ai ,bi) {
+					let a = row[ai], b = row[bi];
+					return a < b ? -1 : a > b ? 1 : 0;
 				});
+				//console.log("indices", indices);
+				//let last = indices.length-1;
+				indices = indices.slice(0, o.hashLength-1);
+				//indices = indices.slice(last - o.hashLength, last);
 				break;
 		}
 		
 		if (o.tagType !== "all") {
 			let hRow = hashVals[r],
-				pRow = product[r];
+				pRow = product[r],
+				debug = [];
 			
-			for (let h=hashLength-1; h>=0; h--) {
+			for (let h=o.hashLength-2; h>=0; h--) {
 				index = indices[h];
-				hRow[index] = pRow[index];
+				(r === 10) && console.log(index);
+				debug[index] = hRow[index] = pRow[index];
 			}
+			
+			let sorted = pRow.sort(),
+				min = sorted[0],
+				max = sorted[sorted.length-1];
+			
+			(r === 10) && console.log({debug, pRow, min, max});
 		}
 	}
 	

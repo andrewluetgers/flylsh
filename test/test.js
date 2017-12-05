@@ -45,24 +45,26 @@ describe("Matrix Utils", function() {
 	});
 	
 	
-	describe("dot", function() {
-		it("computes a matrix dot product", function() {
+	describe("multiply", function() {
+		it("computes a matrix product", function() {
 			let a = [[1,0], [0,1]],
 				b = [[4,1], [2,2]],
 				a2 = [[1,0], [0,1], [0,0], [1,1]],
 				b2 = [[4,1,3], [2,2,3]],
-				c2 = [[4,1], [2,2], [0,0], [6,3]];
+				c2 = [[4,1], [2,2], [0,0], [6,3]],
+				x = [[1,2,3],[4,5,6]],
+				y = [[7,8],[9,10],[11,12]],
+				xy = [[58,64],[139,154]],
+				q = [[1,2,3],[4,5,6],[7,8,9]],
+				r = [[10,11,12],[13,14,15],[16,17,18]],
+				qr = [[84,90,96],[201,216,231],[318,342,366]];
 			
-			assert.deepEqual(m.dot(a, b), b);
-			assert.deepEqual(m.dot(a, b2), b2);
-			assert.deepEqual(m.dot(a2, b), c2);
-		});
-		
-		it("throws if shapes not aligned", function() {
-			let a = [[1, 0, 3], [0, 1, 3]],
-				b = [[4, 1], [2, 2]];
 			
-			assert.throws(()=> {m.dot(a, b)}, Error);
+			assert.deepEqual(m.multiply(a, m.transpose(b)), b);
+			assert.deepEqual(m.multiply(a, m.transpose(b2)), b2);
+			assert.deepEqual(m.multiply(a2, m.transpose(b)), c2);
+			assert.deepEqual(m.multiply(x, m.transpose(y)), xy);
+			assert.deepEqual(m.multiply(q, m.transpose(r)), qr);
 		});
 	});
 	

@@ -8,7 +8,7 @@ function loadData(path, fn) {
 		if (data) {
 			let d = data.toString().split(/\n/g);
 			if (fn && d.length) {
-				let matrix = d.map(row => row.split(',')),
+				let matrix = d.map(row => row.split(',').map(Number)),
 					lastItem = matrix[matrix.length-1];
 				if (!lastItem || !lastItem.length
 					|| lastItem.length===1 && !lastItem[0]) {
@@ -20,9 +20,24 @@ function loadData(path, fn) {
 	});
 }
 
-loadData('../data/mnist/mnist10k.txt', function(data) {
+loadData('../data/glove/glove10k.txt', function(data) {
+//loadData('../data/mnist/mnist10k.txt', function(data) {
 	let d = data.slice(0, 100);
-	//console.log(d[0]);
-	let hashVals = flylsh.hash(d, {kCells: 16, hashLength: 16, tagType: "all"});
+	
+	// lsh mode
+	//let hashVals = flylsh.hash(d, {
+	//	kCells:         16,
+	//	hashLength:     16,
+	//	tagType:        "all",
+	//});
+	
+	// fly mode
+	let hashVals = flylsh.hash(d, {
+		samples:        12,
+		kCells:         1280,
+		hashLength:     16,
+		tagType:        "top"
+	});
+	
 	//console.log(hashVals[0]);
 });

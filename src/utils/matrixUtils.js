@@ -32,31 +32,23 @@ function byColumn(matrix, fn) {
 	}
 }
 
+/**
+ * matrix multiplication
+ * you must transpose b as needed it is not assumed by this function
+ *
+ * @param a {Array} 2D matrix of numbers
+ * @param b {Array} 2D matrix of numbers
+ * @returns {Array|*|{}}
+ */
+function multiply(a, b) {
+	if (a[0].length !== b[0].length) {
+		throw new Error('Width of a '+a[0].length+' must equal width of b '+b[0].length);
+	}
+	return a.map(x => b.map(y => dot(x, y)));
+}
+
 function dot(a, b) {
-	
-	console.log(b);
-	
-	let result = [];
-	
-	if (a[0].length !== b.length) {
-		throw new Error("Columns in a must equal rows in b");
-	}
-	
-	for (let i = 0; i < a.length; i++) {
-		result[i] = [];
-		
-		for (let j = 0; j < b[0].length; j++) {
-			let sum = 0;
-			
-			for (let k = 0; k < a[0].length; k++) {
-				sum += a[i][k] * b[k][j];
-			}
-			
-			result[i][j] = sum;
-			//console.log(result[i][j]);
-		}
-	}
-	return result;
+	return a.map((x, i) => x * b[i]).reduce((m, n) => m + n || 0);
 }
 
 /**
@@ -85,6 +77,7 @@ module.exports = {
 	// generators
 	matrix: matrix,
 	dot: dot,
+	multiply: multiply,
 	transpose: transpose,
 	
 	// modifiers
