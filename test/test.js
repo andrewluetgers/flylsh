@@ -1,7 +1,7 @@
 
 let assert =    require('assert'),
-	distance =  require('../evaluate/distanceMetrics'),
-	flylsh =    require('../src/flylsh'),
+	distance =  require('../evaluate/app/src/distanceMetrics'),
+	flylsh =    require('../src'),
 	m =         require('../src/utils/matrixUtils');
 
 

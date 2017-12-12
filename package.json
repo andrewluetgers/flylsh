@@ -4,16 +4,21 @@
   "description": "Implementation of \"A neural algorithm for a fundamental computing problem\" (2017) based on original implementatio provided by provided by Saket Navlakha",
   "main": "src/flylsh.js",
   "scripts": {
-    "test": "mocha"
+    "test": "mocha",
+    "dev": "webpack -w",
+    "build": "webpack -p"
   },
   "author": "Andrew Luetgers <andrew.luetgers@gmail.com> (http://www.andrewluetgers.com/)",
   "license": "ISC",
   "dependencies": {
     "node-ziggurat": "github:andrewluetgers/node-ziggurat",
-    "quickselect": "^1.0.0"
+    "quickselect": "^1.0.0",
+    "webpack": "^3.10.0"
   },
   "devDependencies": {
     "assert": "^1.4.1",
-    "mocha": "^4.0.1"
+    "babel-core": "^6.26.0",
+    "babel-loader": "^7.1.2",
+    "babel-preset-env": "^1.6.1"
   }
 }
