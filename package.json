@@ -5,7 +5,7 @@
   "main": "src/flylsh.js",
   "scripts": {
     "test": "mocha",
-    "dev": "webpack -w",
+    "dev": "webpack -w & node evaluate/server.js",
     "build": "webpack -p"
   },
   "author": "Andrew Luetgers <andrew.luetgers@gmail.com> (http://www.andrewluetgers.com/)",
