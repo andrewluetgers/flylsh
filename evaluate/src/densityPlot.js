@@ -1,12 +1,23 @@
-import { scaleLinear, scaleSequential, interpolateInferno } from "d3-scale";
+import {
+	scaleLinear, scaleSequential, interpolateViridis, interpolateRainbow,
+	interpolateCool, interpolateWarm, interpolateMagma, interpolatePlasma,
+	interpolateInferno, interpolateCubehelixDefault
+} from "d3-scale";
+import * as chroma from "d3-scale-chromatic"
 import { axisBottom, axisLeft } from "d3-axis";
 import { max } from "d3-array";
 import { color } from "d3-color";
 import { select } from "d3-selection";
 
-function plot(id, buckets, w, h) {
+let scales = Object.assign({}, {interpolateViridis, interpolateRainbow,
+	interpolateCool, interpolateWarm, interpolateMagma, interpolatePlasma,
+	interpolateInferno, interpolateCubehelixDefault}, chroma);
+
+// see https://github.com/d3/d3-scale-chromatic for scale options
+function plot(id, buckets, w, h, scale) {
 	
-	let dimX = buckets[0].length,
+	let intScale = scales['interpolate'+scale] || interpolateRainbow,
+		dimX = buckets[0].length,
 		dimY = buckets.length,
 		margin = {top: 20, right: 50, bottom: 30, left: 50},
 		width = w || 200,
@@ -15,7 +26,7 @@ function plot(id, buckets, w, h) {
 		totalHeight = height+margin.top+margin.bottom,
 		x = scaleLinear().range([0, width]),
 		y = scaleLinear().range([height, 0]),
-		z = scaleSequential(interpolateInferno),
+		z = scaleSequential(intScale),
 		div = document.createElement("div");
 	
 	let s = document.createElementNS("http://www.w3.org/2000/svg", "svg");

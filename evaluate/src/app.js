@@ -6,21 +6,29 @@ let flylsh = require('../../src/index'),
 let data;
 
 let plotData = [];
-for(let row=0; row<1000; row++) {
+for(let row=0; row<100; row++) {
 	let r = [];
-	for(let col=0; col<1000; col++) {
+	for(let col=0; col<100; col++) {
 		r[col] = Math.round(Math.random() * 1e3);
 	}
 	plotData[row] = r;
 }
 
-densityPlot.plot("chart", plotData, 1000, 1000);
-//densityPlot.plot("chart2", plotData);
-//densityPlot.plot("chart3", plotData);
-//densityPlot.plot("chart4", plotData);
-//densityPlot.plot("chart5", plotData);
-//densityPlot.plot("chart6", plotData);
-//densityPlot.plot("chart7", plotData);
+densityPlot.plot("chart10", plotData, 200, 200, "BrBG");
+//densityPlot.plot("chart10", plotData, 200, 200, "piyg");
+
+
+densityPlot.plot("chart", plotData, 200, 200, "Viridis");
+densityPlot.plot("chart1", plotData, 200, 200, "Rainbow");
+densityPlot.plot("chart2", plotData, 200, 200, "Warm");
+densityPlot.plot("chart3", plotData, 200, 200, "Cool");
+densityPlot.plot("chart4", plotData, 200, 200, "Plasma");
+densityPlot.plot("chart5", plotData, 200, 200, "Magma");
+densityPlot.plot("chart5", plotData, 200, 200, "Inferno");
+densityPlot.plot("chart6", plotData, 200, 200);
+
+
+
 
 function test() {
 	
