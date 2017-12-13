@@ -1,7 +1,26 @@
+
 let flylsh = require('../../src/index'),
-	request = require('superagent');
+	request = require('superagent'),
+	densityPlot = require('./densityPlot');
 
 let data;
+
+let plotData = [];
+for(let row=0; row<1000; row++) {
+	let r = [];
+	for(let col=0; col<1000; col++) {
+		r[col] = Math.round(Math.random() * 1e3);
+	}
+	plotData[row] = r;
+}
+
+densityPlot.plot("chart", plotData, 1000, 1000);
+//densityPlot.plot("chart2", plotData);
+//densityPlot.plot("chart3", plotData);
+//densityPlot.plot("chart4", plotData);
+//densityPlot.plot("chart5", plotData);
+//densityPlot.plot("chart6", plotData);
+//densityPlot.plot("chart7", plotData);
 
 function test() {
 	
@@ -24,12 +43,12 @@ function test() {
 		});
 		
 		console.log("flylsh hash vals", hashVals);
+		
 	}
-	
 
 }
 
-test();
+//test();
 
 
 
