@@ -260,7 +260,8 @@ function getOpts(opts={}) {
 
 function hash(data, opts) {
 	
-	let d = data || [[]],
+	let _dbgOut = {},
+		d = data || [[]],
 		o = getOpts(opts),
 		rows = d.length,        // rows of data
 		cols = d[0].length,     // columns in data (dimensions)
@@ -270,10 +271,17 @@ function hash(data, opts) {
 	
 	if (rows < 10) {throw new Error('Minimum of 10 rows required')}
 	
+	function dbgOut(name, obj) {
+		if (o.debug) {
+			_dbgOut[name] = JSON.parse(JSON.stringify(obj||{}));
+		}
+	}
 	
 	// ------------ step 1 normalize ------------
 	normalize(d);
 	//console.log("normalized", rows, cols, d[20]);
+	
+	dbgOut("norm", d);
 	
 	// ------------ step 2 project ------------
 	// create random projection matrix of size Kenyon cells by ORNS.
@@ -284,18 +292,23 @@ function hash(data, opts) {
 		// dense gaussian random matrix (LSH)
 		matrix = m.matrix(o.kCells, cols, rand);
 	}
+	
+	dbgOut("matrix", matrix);
 
 	// compute KC firing activity
 	product = m.multiply(d, matrix);
+	dbgOut("product", product);
 	
 	// "an additional quantization step is used for discretization"
 	m.quantize(product, o.bucketWidth);
+	dbgOut("quantized", product);
 	
-	console.log("quantized", product[10]);
+	//console.log("quantized", product[10]);
 	
 	// ------------ step 3 winner take all ------------
 	// start with 0s
 	hashVals = m.matrix(rows, o.kCells, ()=>0);
+	dbgOut("hashVals", hashVals);
 	
 	// apply WTA to KCs: firing rates at indices corresponding to top/bot/rand/all KCs; 0s elsewhere.
 	if (o.tagType === "random") {
@@ -309,10 +322,12 @@ function hash(data, opts) {
 		switch(o.tagType) {
 			case "all":
 				hashVals[r] = product[r];
+				dbgOut("indices."+r, hashVals[r]);
 				break;
 				
 			case "random":
 				indices = randomIndices;
+				dbgOut("indices."+r, indices);
 				break;
 				
 			default:
@@ -327,8 +342,11 @@ function hash(data, opts) {
 				//let last = indices.length-1;
 				indices = indices.slice(0, o.hashLength-1);
 				//indices = indices.slice(last - o.hashLength, last);
+				dbgOut("indices."+r, indices);
 				break;
 		}
+		
+		
 		
 		if (o.tagType !== "all") {
 			let hRow = hashVals[r],
@@ -349,7 +367,9 @@ function hash(data, opts) {
 		}
 	}
 	
-	return hashVals;
+	dbgOut("hashvals", hashVals);
+	
+	return o.debug ? _dbgOut : hashVals;
 }
 
 

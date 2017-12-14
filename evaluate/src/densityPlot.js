@@ -5,23 +5,44 @@ import {
 } from "d3-scale";
 import * as chroma from "d3-scale-chromatic"
 import { axisBottom, axisLeft } from "d3-axis";
-import { max } from "d3-array";
+import { max, min } from "d3-array";
 import { color } from "d3-color";
 import { select } from "d3-selection";
+import { memoize, debounce } from 'lodash'
+
+// https://github.com/lodash/lodash/issues/2403
+function activate(func, wait=0, options={}) {
+	let mem = _.memoize(function() {
+		return _.debounce(func, wait, options)
+	}, options.resolver);
+	return function(){mem.apply(this, arguments).apply(this, arguments)}
+}
 
 let scales = Object.assign({}, {interpolateViridis, interpolateRainbow,
 	interpolateCool, interpolateWarm, interpolateMagma, interpolatePlasma,
 	interpolateInferno, interpolateCubehelixDefault}, chroma);
 
-// see https://github.com/d3/d3-scale-chromatic for scale options
-function plot(id, buckets, w, h, scale) {
-	
-	let intScale = scales['interpolate'+scale] || interpolateRainbow,
+// see https://github.com/d3/d3-scale-chromatic and https://github.com/d3/d3-scale for scale options
+function plot(id, buckets, opts) {
+	opts = opts || {};
+	let o = opts,
+		simple = o.simple,
+		noAxes = simple || o.noAxes,
+		noLegend = simple || o.noLegend,
+		mSize = simple ? 10 : 20,
+		intScale = scales['interpolate'+o.color] || interpolateCool,
+		margin = {
+			top:    mSize,
+			right:  noLegend ? mSize : 50,
+			bottom: noAxes ? 0 : 30,
+			left:   noAxes ? 0 : 50
+		},
 		dimX = buckets[0].length,
 		dimY = buckets.length,
-		margin = {top: 20, right: 50, bottom: 30, left: 50},
-		width = w || 200,
-		height = h || 200,
+		yScale = o.scale || (o.width ? o.width/dimX : 1),
+		xScale = o.scale || (o.height ? o.height/dimY : 1),
+		width = o.width || dimX * xScale,
+		height = o.height || dimY * yScale,
 		totalWidth = width+margin.left+margin.right,
 		totalHeight = height+margin.top+margin.bottom,
 		x = scaleLinear().range([0, width]),
@@ -46,62 +67,75 @@ function plot(id, buckets, w, h, scale) {
 		.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 		
 	// Compute the scale domains.
-	let zMax =  max(buckets, r => max(r));
+	let zMax =  max(buckets, r => max(r)),
+		zMin =  min(buckets, r => min(r));
+	
 	z.domain([0, zMax]);
 	x.domain([0, buckets[0].length]);
 	y.domain([0, buckets.length]);
 	
-	// Add a legend for the color values.
-	let labels = 11,
-		yUnit = zMax / height,
-		labelSpace = height / labels,
-		labelIncrement = 100, // will show label if val % labelIncrement == 0
-		segments = 100,
-		legendWidth = 10,
-		textMargin = 6,
-		segHeight = (height) / segments,
+	if (!noLegend) {
+		// legend
+		let labelIncrement = o.legendIncrement, // will show label if val % labelIncrement == 0
+			segments = o.legendSegments || 10,
+			legendWidth = 10,
+			textMargin = 6,
+			segHeight = height / segments,
+			legend;
+		
 		legend = svg.selectAll(".legend")
-		.data(z.ticks(segments+1).slice(1).reverse())
-		.enter().append("g")
-		.attr("class", "legend")
-		.attr("transform", function(d, i) { return "translate(" + (width + legendWidth) + "," + (i * segHeight) + ")"; });
+			.data(z.ticks(segments).reverse())
+			.enter().append("g")
+			.attr("class", "legend")
+			.attr("transform", function(d, i) {
+				return "translate(" + (width + legendWidth) + "," + (i * segHeight) + ")";
+			});
+		
+		legend.append("rect")
+			.attr("width", legendWidth)
+			.attr("height", segHeight)
+			.style("fill", z);
+		
+		console.log("zMin", zMin);
+		
+		let simpleFilter = d => d === zMin || d === zMax || d === (zMax-zMin)/2,
+			modFilter = d => d === zMin || d === zMax || !(d % labelIncrement);
+		
+		legend.append("text")
+			.filter(labelIncrement ? modFilter : simpleFilter)
+			.attr("x", legendWidth + textMargin)
+			.attr("y", (d) => {return d === zMin ? -2 : (d === zMax ? 3 : 1)})
+			.attr("dy", ".35em")
+			.text(String);
+	}
 	
-	legend.append("rect")
-		.attr("width", legendWidth)
-		.attr("height", segHeight)
-		.style("fill", z);
-	
-	
-	legend.append("text")
-		.filter(d => !d || !(d % labelIncrement))
-		.attr("x", legendWidth + textMargin)
-		.attr("y", 10)
-		.attr("dy", ".35em")
-		.text(String);
-	
-	// Add an x-axis with label.
-	svg.append("g")
-		.attr("class", "x axis")
-		.attr("transform", "translate(0," + height + ")")
-		.call(axisBottom().scale(x))
-		.append("text")
-		.attr("class", "label")
-		.attr("x", width)
-		.attr("y", -6)
-		.attr("text-anchor", "end")
-		.text("Date");
-	
-	// Add a y-axis with label.
-	svg.append("g")
-		.attr("class", "y axis")
-		.call(axisLeft().scale(y))
-		.append("text")
-		.attr("class", "label")
-		.attr("y", 6)
-		.attr("dy", ".71em")
-		.attr("text-anchor", "end")
-		.attr("transform", "rotate(-90)")
-		.text("Value");
+	if (!noAxes) {
+		// x-axis
+		
+		let xTicks = o.xTicks || 2,
+			yTicks = o.yTicks || 2;
+		
+		svg.append("g")
+			.attr("class", "x axis")
+			.attr("transform", "translate(0," + height + ")")
+			.call(axisBottom().ticks(xTicks).scale(x))
+			.append("text")
+			.attr("class", "label")
+			.attr("x", width)
+			.attr("y", -6)
+			.attr("text-anchor", "end");
+		
+		// y-axis
+		svg.append("g")
+			.attr("class", "y axis")
+			.call(axisLeft().ticks(yTicks).scale(y))
+			.append("text")
+			.attr("class", "label")
+			.attr("y", 6)
+			.attr("dy", ".71em")
+			.attr("text-anchor", "end")
+			.attr("transform", "rotate(-90)");
+	}
 	
 	// canvas plot
 	let c = document.createElement("canvas"),
@@ -112,6 +146,25 @@ function plot(id, buckets, w, h, scale) {
 	c.setAttribute("height", dimY);
 	c.setAttribute("style", `width:${width}px; height:${height}px; margin-left:${margin.left+1}px; margin-top:${margin.top}px`);
 	div.appendChild(c);
+	
+	if (o.mousemove) {
+		
+		let fn = activate(o.mousemove, 100, {
+			'leading': true,
+			'trailing': false
+		});
+		
+		c.addEventListener("mousemove", e => {
+			let m = getMousePos(c, e);
+			fn(Math.floor(m.x/xScale), Math.floor(m.y/yScale));
+		});
+	}
+	
+	
+	function getMousePos(canvas, e) {
+		let rect = canvas.getBoundingClientRect();
+		return {x: e.clientX - rect.left, y: e.clientY - rect.top};
+	}
 	
 	let imageData = ctx.getImageData(0, 0, c.width, c.height),
 		rgb = imageData.data,
@@ -128,7 +181,6 @@ function plot(id, buckets, w, h, scale) {
 		});
 	});
 	ctx.putImageData(imageData, 0, 0);
-	
 }
 
 
