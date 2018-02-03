@@ -50,9 +50,40 @@
 			-ms-interpolation-mode: nearest-neighbor;   /* IE                            */
 		}
 
+		#tip {
+			position: absolute;
+			z-index: 10;
+			padding: 10px;
+			margin-top: -20px;
+			margin-left: 40px;
+			text-align: center;
+			font-size: 16px;
+			width: 60px;
+			border: solid 1px #ccccff;
+			background: white;
+		}
+
+		.detail {
+			padding-top: 20px;
+		}
+
+		.txt {
+			width: 200px;
+			height: 50px;
+			font-size: 9px;
+			clear: both;
+		}
+
 	</style>
 </head>
 <body>
+	<div id="tip"></div>
+
+	<table>
+		<tbody id="debugTable">
+		</tbody>
+	</table>
+	<div id="info"></div>
 	<script src="app.js"></script>
 </body>
 </html>

@@ -12,10 +12,10 @@
   "license": "ISC",
   "dependencies": {
     "node-ziggurat": "github:andrewluetgers/node-ziggurat",
-    "quickselect": "^1.0.0",
-    "webpack": "^3.10.0"
+    "quickselect": "^1.0.1"
   },
   "devDependencies": {
+    "webpack": "^3.10.0",
     "assert": "^1.4.1",
     "babel-core": "^6.26.0",
     "babel-loader": "^7.1.2",

@@ -18,7 +18,7 @@ function l2Distance(x, y) {
 		throw new Error("Input array lengths must be the same");
 	}
 	
-	for (i = 0; i<len; i++) {
+	for (let i = 0; i<len; i++) {
 		let val = x[i] - y[i],
 			abs = Math.abs(val);
 		

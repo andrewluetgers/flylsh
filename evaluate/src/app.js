@@ -1,51 +1,15 @@
 
-let flylsh = require('../../src/index'),
-	request = require('superagent'),
-	densityPlot = require('./densityPlot');
+import request from 'superagent'
+import {hash} from '../../src/index'
+import {transpose} from '../../src/utils/matrixUtils'
+import {densityPlot} from 'density-plot'
+import {meanAvgPrecision} from './meanAvgPrecision'
+
+	//heapq = require('@aureooms/js-heapq'),
+
 
 let data;
-
-function genData(x, y, max) {
-	let plotData = [];
-	for(let row=0; row<x; row++) {
-		let r = [];
-		for(let col=0; col<y; col++) {
-			r[col] = Math.round(Math.random() * max);
-		}
-		plotData[row] = r;
-	}
-	return plotData;
-}
-
-
-densityPlot.plot("chart10", genData(100, 100, 1e3));
-densityPlot.plot("chart10", genData(10, 10, 1e3), {simple: true, width: 200, height: 200});
-
-let data11 = genData(10, 10, 1e3);
-densityPlot.plot("chart11", data11, {
-	scale: 20,
-	color: "Cool",
-	mousemove: function(x, y) {
-		console.log(x, y, data11[y][x]);
-	}
-});
-
-
-
-//densityPlot.plot("chart", plotData, 200, 200, "Viridis");
-//densityPlot.plot("chart1", plotData, 200, 200, "Rainbow");
-//densityPlot.plot("chart2", plotData, 200, 200, "Warm");
-//densityPlot.plot("chart3", plotData, 200, 200, "Cool");
-//densityPlot.plot("chart4", plotData, 200, 200, "Plasma");
-//densityPlot.plot("chart5", plotData, 200, 200, "Magma");
-//densityPlot.plot("chart5", plotData, 200, 200, "Inferno");
-//densityPlot.plot("chart6", plotData, 200, 200);
-
-
-
-
 function test() {
-	
 	if (!data) {
 		console.log("loading data...");
 		request('GET', '/data/mnist/mnist10k.json').end((err, res) => {
@@ -57,52 +21,136 @@ function test() {
 		let d = data.slice(0, 100);
 		
 		// lsh mode
-		let vals = flylsh.hash(d, {
-			debug:          true,
-			kCells:         16,
-			hashLength:     16,
-			tagType:        "all",
-		});
-		
-		//let hashVals = flylsh.hash(d, {
-		//	samples:        12,
-		//	kCells:         1280,
+		//let vals = flylsh.hash(d, {
+		//	debug:          true,
+		//	kCells:         16,
 		//	hashLength:     16,
-		//	filter:         "top",
-		//	bucketWidth:    .1
+		//	tagType:        "all",
 		//});
 		
-		console.log("lsh vals", vals);
-		//console.log("flylsh hash vals", hashVals);
+		console.time("flylsh");
+		let vals = hash(d, {
+			debug:          true,
+			samples:        12,
+			kCells:         1280,
+			hashLength:     16,
+			tagType:        "top",
+			//bucketWidth:    .1
+		});
+		console.timeEnd("flylsh");
+		//console.log("lsh vals", vals);
+		//console.log("flylsh hash vals", vals);
 		
-	}
+		console.time("map");
+		let map = meanAvgPrecision(d, vals.hashVals);
+		console.timeEnd("map");
+		
+		vals.mapInfo = map;
+		
+		
+		let table = document.getElementById("debugTable"),
+			steps = Object.keys(vals);
 
+		table.innerHTML = steps.map(s => {
+			return `
+				<tr>
+					<td>
+						<h3>${s}</h3>
+						<div id="${s}Data"></div>
+					</td>
+					<td class="detail">
+						<div id="${s}Detail"></div>
+						<!--<textarea id="${s}DetailTxt" class="txt"></textarea>-->
+					</td>
+				</tr>`;
+		}).join("");
+		
+		
+
+		steps.forEach(s => {
+			let v = vals[s];
+			//console.log(s+"Data", v);
+			
+			if (s.match(/info/i)) {
+				infoOut("Mean Average Precision: " + map, "info");
+				
+			} else {
+				densityPlot(v, {
+					target:     document.getElementById(s+"Data"),
+					zTicks:		7,
+					color:      "Viridis",
+					height:     100, // 2x the number of samples
+					width:      500, // number of dimensions, others will be stretched
+					mousemove:  getHandler(v, s+"Detail", s+"DetailTxt")
+				});
+			}
+		});
+		
+		
+
+	}
 }
+
 
 test();
 
 
+let tipX, tipY, tipId;
 
-//
-//loadData('../data/glove/glove10k.txt', function(data) {
-//loadData('../data/mnist/mnist10k.txt', function(data) {
-//	let d = data.slice(0, 100);
-//
-//	// lsh mode
-//	let hashVals = flylsh.hash(d, {
-//		kCells:         16,
-//		hashLength:     16,
-//		tagType:        "all",
-//	});
-//
-//	// fly mode
-//	//let hashVals = flylsh.hash(d, {
-//	//	samples:        12,
-//	//	kCells:         1280,
-//	//	hashLength:     16,
-//	//	tagType:        "top",
-//	//	bucketWidth:    .1
-//	//});
-//
-//	console.log(hashVals);
-//});
+function getHandler(data, renderDetailId, renderDetailTxtId) {
+	return (x, y, e) => {
+		let doc = document.documentElement,
+			left = (window.pageXOffset || doc.scrollLeft) - (doc.clientLeft || 0),
+			top = (window.pageYOffset || doc.scrollTop)  - (doc.clientTop || 0),
+			val = data && y>-1 && data[y] && data[y][x] || 0;
+		
+		tip.innerText = Math.round(val*100)/100;
+		tip.setAttribute("style", "top:" +(e.clientY+top)+"px; left:"+(e.clientX+left)+"px");
+		
+		// render detail plot
+		if (renderDetailId) {
+			if (y !== tipY && y > -1) {
+				let mat = toMatrix(data[y], null, true);
+				//console.log(renderDetailId, mat);
+				densityPlot(mat, {
+					target:         document.getElementById(renderDetailId),
+					//simple:       true,
+					//scale:        4,
+					zTicks:         7,
+					color:          "Viridis",
+					mousemove:      getHandler(mat)
+				});
+				//txtOut(data[y], renderDetailTxtId);
+			}
+		}
+		
+		// update priors
+		tipX = x; tipY = y; tipId = e.target.id;
+	};
+}
+
+function toMatrix(data, cols, transposed) {
+	cols = cols || Math.ceil(Math.sqrt(data.length));
+	let mat = [];
+	for (let i=0, j=data.length; i<j; i+=cols) {
+		mat.push(data.slice(i, i+cols));
+	}
+	return transposed
+		? transpose(mat)
+		: mat;
+}
+
+function txtOut(data, id, spacer) {
+	let el = document.getElementById(id);
+	el.innerText = data.join(spacer || " ");
+}
+
+function infoOut(info, id, append) {
+	let el = document.getElementById(id);
+	
+	if (append) {
+		el.innerHTML += info;
+	} else {
+		el.innerHTML = info;
+	}
+}

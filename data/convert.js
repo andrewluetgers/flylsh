@@ -19,9 +19,10 @@ function loadData(path, fn) {
 }
 
 let data = [
-	{path: './gist/', name: 'gist10k'},
+	{path: './gist/', name: 'gist10k'} ,
 	{path: './glove/', name: 'glove10k'},
 	{path: './mnist/', name: 'mnist10k'},
+	{path: './mnist/', name: 'mnist100'},
 	{path: './sift/', name: 'sift10k'}
 ];
 

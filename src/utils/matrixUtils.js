@@ -53,7 +53,7 @@ function dot(a, b) {
 
 /**
  * modifies given matrix by
- * dividing all values by buckets
+ * dividing all values by width
  * and flooring the value
  *
  * @param matrix {Array} 2D array of numbers

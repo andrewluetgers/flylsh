@@ -21,27 +21,46 @@ setSeed(); // uses timestamp by default
  * returns s random (uniformly distributed) sample indices
  * without replacement (no duplicates) from n possibilities
  *
- * @param s {Number} number of samples
- * @param n {Number} size of array to sample from
+ * @param s {Number} size of array to sample from
+ * @param n {Number} number of samples
  * @returns {Array} list of random indices into an array of n length
  */
-function randomSamples(s, n) {
+function randomIndices(s, n) {
 	let bucket = [], indices = [];
 	
-	if (s>n) {
-		throw new Error("s should be <= n");
-	}
-	
-	for (let i=0; i<n; i++) {
-		bucket.push(i);
+	if (n>s) {
+		throw new Error("n should be <= s");
 	}
 	
 	for (let i=0; i<s; i++) {
+		bucket.push(i);
+	}
+	
+	for (let i=0; i<n; i++) {
 		indices.push(bucket.splice(Math.floor(Math.random()*bucket.length), 1)[0]);
 	}
 	
 	return indices;
 }
+
+///**
+// * returns samples selected randomly (uniformly distributed)
+// * without replacement (no duplicates) from population
+// *
+// * @param population {Array} items to sample from
+// * @param n {Number} number of samples to return
+// * @returns {Array} list of random samples from population
+// */
+//function randomSamples(population, n) {
+//	let keys = Object.keys(population),
+//		samples = [];
+//
+//	for (let i=0; i<n; i++) {
+//		samples.push(keys.splice(Math.floor(Math.random()*keys.length), 1)[0]);
+//	}
+//
+//	return samples;
+//}
 
 
 /**
@@ -60,7 +79,7 @@ function binaryRandomMatrix(rows, cols, samples) {
 	}
 	
 	let matrix = m.matrix(rows, cols, ()=>0);
-	matrix.forEach(row => randomSamples(samples, cols).forEach(i => row[i] = 1));
+	matrix.forEach(row => randomIndices(cols, samples).forEach(i => row[i] = 1));
 	
 	return matrix;
 }
@@ -80,32 +99,31 @@ function normalizeColumnMins(matrix, targetMin) {
 	let mins = [];
 	
 	// set mins by column
-	m.byColumn(matrix, (r, c) => mins[c] = Math.min(mins[c]||Infinity, matrix[r][c]));
+	m.byColumn(matrix, (r, c) => mins[c] = Math.abs(Math.min(mins[c]||0, matrix[r][c])));
 	
 	//console.log("mins", mins);
 	// todo determine if option 2 is the best answer
 	
 	//option 1: raise everything by the same amount (same as original)
 	mins = mins.map(Math.abs);
-	console.log("mins", mins);
-	console.log("matrix", matrix[0]);
+	//console.log("mins", mins);
+	//console.log("matrix", matrix[0]);
 	m.byColumn(matrix, (r, c) => matrix[r][c] = (matrix[r][c]||0) + (mins[c]+targetMin));
 	
-	console.log("row 10", matrix[10]);
 	//option 2: raise or lower so all share the same min (seems more "normalized")
 	//m.byColumn(matrix, (r, c) => matrix[r][c] -= (mins[c]+targetMin));
 }
 
 
 /**
- * produced a new matrix by scaling given matrix rows
+ * produced a new matrix by scaling given matrix values
  * such that all rows will share the same mean
  *
  * @param matrix {Array} 2d matrix of numbers
  * @param targetMean {Number} optional, defaults to 100
  * @returns {Array} new matrix
  */
-function normalizeRowMeans(matrix, targetMean) {
+function centerRowMeans(matrix, targetMean) {
 	targetMean = (typeof targetMean === "number") ? targetMean : 100;
 	
 	let rows = matrix.length,
@@ -116,42 +134,26 @@ function normalizeRowMeans(matrix, targetMean) {
 	}
 	
 	for (let r=0; r<rows; r++) {
-		let row = matrix[r],
-			sum = row.reduce((p,c) => p + c),
-			mean = sum / cols,
-			mult = mean ? targetMean/mean : 1;
+		let row = matrix[r], sum = 0, mean, mult;
+		
+		for (let c=0; c<cols; c++) {
+			sum += row[c]
+		}
+		
+		mean = sum / cols,
+		mult = mean ? targetMean/mean : 1;
 		
 		// hot code, avoiding iterator function call overhead of array methods
-		if (!sum && !mean) {
-			for (let c=0; c<cols; c++) {row[c] = row[c]+targetMean}
-		} else {
-			for (let c=0; c<cols; c++) {row[c] = row[c]*mult}
+		// todo verify what to do in case of 0 mean
+		for (let c=0; c<cols; c++) {
+			row[c] = row[c]*mult
 		}
 	}
-}
-
-/**
- * modifies given data in-place!!
- *
- * @param data {Array} 2D array of numbers
- * @returns {Array}
- */
-function normalize(data) {
-	// normalize to positive values
-	normalizeColumnMins(data, 0);
-	
-	
-	// center the means to targetMean
-	normalizeRowMeans(data, 100);
-	console.log("n2", data[0]);
 }
 
 // return a completed set of options
 // uses defaults for those not given
 function getOpts(opts={}) {
-	
-
-	
 	let o = {
 		debug:          opts.debug          || false,
 		reps:           opts.reps           || 50,
@@ -177,7 +179,7 @@ function getOpts(opts={}) {
  *   debug           turns on logging                               (default=false)
  *   kCells          number of Kenyon cells                         (default=50)
  *   bucketWidth     modifies the quantization process              (default=10)
- *   hashLength      number of returned values per row              (default=1r)
+ *   hashLength      number of returned values per row              (default=16)
  *   tagType         winner-take-all method all|top|bottom|random   (default="top")
  *   samples         set for sparse binary projection type          (default=undefined)
  *                   recommended value = data dimensions/10
@@ -200,8 +202,8 @@ function getOpts(opts={}) {
  * PNs project randomly to the Kenyon cells (KCs) https://en.wikipedia.org/wiki/Kenyon_cell
  * there are many more Kenyon cells than PNs
  *
- * "40-fold expansion in the number of neurons 50 PNs project to 2000 Kenyon cells (KCs),
- * connected by a sparse, binary random connection matrix (14). Each Kenyon cell
+ * "40-fold expansion in the number of neurons 50 PNs project to 2000 Kenyon cells,
+ * connected by a sparse, binary random connection matrix. Each Kenyon cell
  * receives and sums the firing rates from about 6 randomly selected PNs"
  *
  * the above quote would look like the following
@@ -213,7 +215,6 @@ function getOpts(opts={}) {
  * Basic Steps:
  *
  * ------ step 1 normalize ------
- * input data is normalized:
  *  1 columns are shifted to have positive values
  *  2 row values are scaled so that all rows share the same mean
  *    see https://en.wikipedia.org/wiki/Normalization_model
@@ -260,28 +261,43 @@ function getOpts(opts={}) {
 
 function hash(data, opts) {
 	
-	let _dbgOut = {},
+	let dbgOut = {},
 		d = data || [[]],
 		o = getOpts(opts),
 		rows = d.length,        // rows of data
 		cols = d[0].length,     // columns in data (dimensions)
 		matrix,                 // the random projection matrix
 		product,                // the computed Kenyon cell activity
-		hashVals;               // hash values for provided data
+		hashVals,               // hash values for provided data
+		randIndices;
 	
 	if (rows < 10) {throw new Error('Minimum of 10 rows required')}
 	
-	function dbgOut(name, obj) {
+	function debugOut(name, obj, isArrayMember) {
 		if (o.debug) {
-			_dbgOut[name] = JSON.parse(JSON.stringify(obj||{}));
+			let array;
+			if (isArrayMember) {
+				array = dbgOut[name] = (dbgOut[name] || []);
+				array.push(obj);
+			} else {
+				dbgOut[name] = JSON.parse(JSON.stringify(obj || {}));
+			}
 		}
 	}
 	
-	// ------------ step 1 normalize ------------
-	normalize(d);
-	//console.log("normalized", rows, cols, d[20]);
+	debugOut("step0_data", data);
 	
-	dbgOut("norm", d);
+	// ------------ step 1 normalize ------------
+	// the following 2 operations modify the data in place !!
+	
+	// normalize to positive values
+	normalizeColumnMins(data, 0);
+	debugOut("step1_normalizeColumnMins", data);
+	
+	// center the means to targetMean
+	centerRowMeans(data, 100);
+	debugOut("step1_centerRowMeans", data);
+	
 	
 	// ------------ step 2 project ------------
 	// create random projection matrix of size Kenyon cells by ORNS.
@@ -293,91 +309,77 @@ function hash(data, opts) {
 		matrix = m.matrix(o.kCells, cols, rand);
 	}
 	
-	dbgOut("matrix", matrix);
+	debugOut("step2_matrix", matrix);
 
 	// compute KC firing activity
 	product = m.multiply(d, matrix);
-	dbgOut("product", product);
+	debugOut("step3_product", product);
 	
 	// "an additional quantization step is used for discretization"
 	m.quantize(product, o.bucketWidth);
-	dbgOut("quantized", product);
-	
-	//console.log("quantized", product[10]);
+	debugOut("step4_quantized", product);
 	
 	// ------------ step 3 winner take all ------------
 	// start with 0s
 	hashVals = m.matrix(rows, o.kCells, ()=>0);
-	dbgOut("hashVals", hashVals);
+	//debugOut("step7-0_hashvals", hashVals);
 	
 	// apply WTA to KCs: firing rates at indices corresponding to top/bot/rand/all KCs; 0s elsewhere.
 	if (o.tagType === "random") {
 		// fix indices for all odors, otherwise, can't compare.
-		randomIndices = randomSamples(o.hashLength, o.kCells);
+		randIndices = randomIndices(o.kCells, o.hashLength);
 	}
 	
-	let index, indices, randomIndices;
+	let allInds = [],
+		allVals = [];
+	
 	for (let r=0; r<rows; r++) {
 		// winner take all
+		let indsRow;
 		switch(o.tagType) {
 			case "all":
 				hashVals[r] = product[r];
-				dbgOut("indices."+r, hashVals[r]);
+				debugOut("step6_indices_all", hashVals[r], true);
 				break;
 				
 			case "random":
-				indices = randomIndices;
-				dbgOut("indices."+r, indices);
+				indices = randIndices;
+				debugOut("step6_indices_random", indices, true);
 				break;
 				
 			default:
 			case "top":
-				let row = product[r];
-				indices = Object.keys(row);
-				quickselect(indices, o.hashLength, null, null, function(ai ,bi) {
+				let row = product[r], valsRow = [];
+				indsRow = Object.keys(row).map(Number);
+				quickselect(indsRow, o.hashLength, null, null, function(ai ,bi) {
 					let a = row[ai], b = row[bi];
-					return a < b ? -1 : a > b ? 1 : 0;
+					return a < b ? 1 : a > b ? -1 : 0;
 				});
-				//console.log("indices", indices);
-				//let last = indices.length-1;
-				indices = indices.slice(0, o.hashLength-1);
-				//indices = indices.slice(last - o.hashLength, last);
-				dbgOut("indices."+r, indices);
+				
+				indsRow = indsRow.slice(0, o.hashLength); // comment out to debug selection
+				indsRow.forEach(i => {
+					hashVals[r][i] = row[i];
+					valsRow.push(row[i]);
+				});
+				allInds.push(indsRow);
+				allVals.push(valsRow);
 				break;
-		}
-		
-		
-		
-		if (o.tagType !== "all") {
-			let hRow = hashVals[r],
-				pRow = product[r],
-				debug = [];
-			
-			for (let h=o.hashLength-2; h>=0; h--) {
-				index = indices[h];
-				(r === 10) && console.log(index);
-				debug[index] = hRow[index] = pRow[index];
-			}
-			
-			let sorted = pRow.sort(),
-				min = sorted[0],
-				max = sorted[sorted.length-1];
-			
-			(r === 10) && console.log({debug, pRow, min, max});
 		}
 	}
 	
-	dbgOut("hashvals", hashVals);
+	debugOut("step7_allTopIndices", allInds);
+	debugOut("step7_allTopVals", allVals);
+	debugOut("hashVals", hashVals);
 	
-	return o.debug ? _dbgOut : hashVals;
+	return o.debug ? dbgOut : {hashVals: hashVals};
 }
 
 
 module.exports = {
 	hash: hash,
 	setSeed: setSeed,
-	randomSamples: randomSamples,
+	randomIndices: randomIndices,
 	binaryRandomMatrix: binaryRandomMatrix,
-	normalizeRowMeans: normalizeRowMeans,
+	centerRowMeans: centerRowMeans,
 	normalizeColumnMins: normalizeColumnMins
 };
