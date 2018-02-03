@@ -6,4 +6,13 @@ LSH implementation based on the fly olfactory system from "A neural algorithm fo
 
 This implementation is based on the original Python implementation generously provided by [Saket Navlakha](http://www.snl.salk.edu/~navlakha/)
 
+```
+npm install
+
+npm run dev
+```
+
+open http://localhost:3000/ to view debug output as below
+
 ![flylshdebugoutput](https://user-images.githubusercontent.com/232036/35764107-19e3e0fa-0880-11e8-9287-02b14d31da9a.png)
+
