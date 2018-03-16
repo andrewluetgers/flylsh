@@ -1,88 +1,9 @@
 
-let Ziggurat =      require('node-ziggurat'),
-	quickselect =   require('quickselect'),
-	m =             require('./utils/matrixUtils');
+import quickselect from 'quickselect'
+import * as mat from './utils/matrix'
+import {randomIndices, binaryRandomMatrix} from './utils/random'
 
-
-// setup how random numbers are generated, algorithm calls for
-// normally distributed Ziggurat is the fastest impl I can find
-// see https://github.com/andrewluetgers/nRandTest
-let rand;
-function setSeed(seed) {
-	let z = new Ziggurat(seed);
-	rand = z.nextGaussian;
-	return rand;
-}
-
-setSeed(); // uses timestamp by default
-
-
-/**
- * returns s random (uniformly distributed) sample indices
- * without replacement (no duplicates) from n possibilities
- *
- * @param s {Number} size of array to sample from
- * @param n {Number} number of samples
- * @returns {Array} list of random indices into an array of n length
- */
-function randomIndices(s, n) {
-	let bucket = [], indices = [];
-	
-	if (n>s) {
-		throw new Error("n should be <= s");
-	}
-	
-	for (let i=0; i<s; i++) {
-		bucket.push(i);
-	}
-	
-	for (let i=0; i<n; i++) {
-		indices.push(bucket.splice(Math.floor(Math.random()*bucket.length), 1)[0]);
-	}
-	
-	return indices;
-}
-
-///**
-// * returns samples selected randomly (uniformly distributed)
-// * without replacement (no duplicates) from population
-// *
-// * @param population {Array} items to sample from
-// * @param n {Number} number of samples to return
-// * @returns {Array} list of random samples from population
-// */
-//function randomSamples(population, n) {
-//	let keys = Object.keys(population),
-//		samples = [];
-//
-//	for (let i=0; i<n; i++) {
-//		samples.push(keys.splice(Math.floor(Math.random()*keys.length), 1)[0]);
-//	}
-//
-//	return samples;
-//}
-
-
-/**
- * produces a new 2D Array of cols width, rows height
- * each row will have samples # of random 1s set
- * all other values will be 0
- *
- * @param rows {Number}
- * @param cols {Number}
- * @param samples {Number} number of random 1s per row
- * @returns {Array} 2D array of cols width and rows height
- */
-function binaryRandomMatrix(rows, cols, samples) {
-	if (samples > cols) {
-		throw new Error("Binary samples should not exceed number of cols.");
-	}
-	
-	let matrix = m.matrix(rows, cols, ()=>0);
-	matrix.forEach(row => randomIndices(cols, samples).forEach(i => row[i] = 1));
-	
-	return matrix;
-}
+let rand = Math.random;
 
 
 /**
@@ -94,12 +15,12 @@ function binaryRandomMatrix(rows, cols, samples) {
  * @param matrix {Array} 2d matrix of numbers
  * @param targetMin {Number} optional, defaults to 0
  */
-function normalizeColumnMins(matrix, targetMin) {
+export function normalizeColumnMins(matrix, targetMin) {
 	targetMin = targetMin || 0;
 	let mins = [];
 	
 	// set mins by column
-	m.byColumn(matrix, (r, c) => mins[c] = Math.abs(Math.min(mins[c]||0, matrix[r][c])));
+	mat.byColumn(matrix, (r, c) => mins[c] = Math.abs(Math.min(mins[c]||0, matrix[r][c])));
 	
 	//console.log("mins", mins);
 	// todo determine if option 2 is the best answer
@@ -108,10 +29,10 @@ function normalizeColumnMins(matrix, targetMin) {
 	mins = mins.map(Math.abs);
 	//console.log("mins", mins);
 	//console.log("matrix", matrix[0]);
-	m.byColumn(matrix, (r, c) => matrix[r][c] = (matrix[r][c]||0) + (mins[c]+targetMin));
+	mat.byColumn(matrix, (r, c) => matrix[r][c] = (matrix[r][c]||0) + (mins[c]+targetMin));
 	
 	//option 2: raise or lower so all share the same min (seems more "normalized")
-	//m.byColumn(matrix, (r, c) => matrix[r][c] -= (mins[c]+targetMin));
+	//mat.byColumn(matrix, (r, c) => matrix[r][c] -= (mins[c]+targetMin));
 }
 
 
@@ -123,7 +44,7 @@ function normalizeColumnMins(matrix, targetMin) {
  * @param targetMean {Number} optional, defaults to 100
  * @returns {Array} new matrix
  */
-function centerRowMeans(matrix, targetMean) {
+export function centerRowMeans(matrix, targetMean) {
 	targetMean = (typeof targetMean === "number") ? targetMean : 100;
 	
 	let rows = matrix.length,
@@ -176,17 +97,19 @@ function getOpts(opts={}) {
  *
  * @param data {Array} 2D matrix of numbers
  * @param opts {Object} optional
- *   debug           turns on logging                               (default=false)
+ *   debug           returns intermediate values                    (default=false)
  *   kCells          number of Kenyon cells                         (default=50)
  *   bucketWidth     modifies the quantization process              (default=10)
  *   hashLength      number of returned values per row              (default=16)
  *   tagType         winner-take-all method all|top|bottom|random   (default="top")
  *   samples         set for sparse binary projection type          (default=undefined)
- *                   recommended value = data dimensions/10
- *                   default value = traditional LSH behavior
+ *                   undefined (default):
+ *                      produces traditional LSH behavior
+ *                   recommended value: dimensions/10
+ *                      produces FLY LSH behavior
  *
  * ------------------------------------------------------------------------------------
- * all quotations and details from https://doi.org/10.1101/180471
+ * quotations from https://doi.org/10.1101/180471
  * ------------------------------------------------------------------------------------
  *
  * Fly Olfactory Model and Terminology:
@@ -194,7 +117,7 @@ function getOpts(opts={}) {
  * input data corresponds to scents
  * each data column corresponds a specific odorant receptor neuron (ORN) type
  * thus a row represents the total ORN response to a given scent
- **
+ *
  * ORNs connect to projection neurons (PNs) in structures called glomeruli
  * this is a feed-forward / 1-to-1 mapping
  * in this code data columns (cols), dimensions, ORNs, and PNs are equivalent
@@ -206,26 +129,25 @@ function getOpts(opts={}) {
  * connected by a sparse, binary random connection matrix. Each Kenyon cell
  * receives and sums the firing rates from about 6 randomly selected PNs"
  *
- * the above quote would look like the following
- * input data would have 50 columns/dimensions
+ * the above quote would look like the following:
+ *  (input data would have 50 columns/dimensions)
+ *  hash(data, {kCells: 2000, samples: 6})
  *
- * hash(data, {kCells: 2000, samples: 6})
  *
+ * Basic Steps of the Algorithm:
  *
- * Basic Steps:
- *
- * ------ step 1 normalize ------
+ * ------ step 1 normalization ------
  *  1 columns are shifted to have positive values
  *  2 row values are scaled so that all rows share the same mean
  *    see https://en.wikipedia.org/wiki/Normalization_model
  *
- * ------ step 2 project ------
+ * ------ step 2 random projection ------
  * large expansion of neurons (a signature feature of the fly algorithm)
  *
  * ------ step 3 winner take all ------
  * "a winner-take-all circuit using strong inhibitory feedback from a single
  * inhibitory neuron, called APL. As a result, all but the highest firing 5% of
- * Kenyon cells are silenced (3, 5, 6, 15). The firing rates of the remaining 5%
+ * Kenyon cells are silenced. The firing rates of the remaining 5%
  * corresponds to the tag assigned to the input odor."
  *
  * ------------------------------------------------------------------------------------
@@ -259,7 +181,7 @@ function getOpts(opts={}) {
  * e.g. hash(data, {kCells: 16, hashLength: 16, tagType: "all"})
  */
 
-function hash(data, opts) {
+export function hash(data, opts) {
 	
 	let dbgOut = {},
 		d = data || [[]],
@@ -303,35 +225,45 @@ function hash(data, opts) {
 	// create random projection matrix of size Kenyon cells by ORNS.
 	if (o.samples) {
 		// sparse binary random matrix (FLY)
-		matrix = binaryRandomMatrix(o.kCells, cols, o.samples);
+		matrix = binaryRandomMatrix(cols, o.kCells, o.samples, rand);
+		// compute KC firing activity
+		//console.time("matB");
+		//product = mat.multiplyB(d, matrix);
+		//console.timeEnd("matB");
+		console.time("matWeblas");
+		product = mat.chunk(mat.multiplyWeblas(d, matrix), matrix[0].length);
+		console.timeEnd("matWeblas");
 	} else {
 		// dense gaussian random matrix (LSH)
-		matrix = m.matrix(o.kCells, cols, rand);
+		//matrix = mat.matrix(o.kCells, cols, nrand); // why normal random?
+		matrix = mat.matrix(cols, o.kCells, rand);
+		// compute KC firing activity
+		//product = mat.multiply(d, matrix);
+		product = mat.multiplyWeblas(d, matrix);
 	}
 	
 	debugOut("step2_matrix", matrix);
-
-	// compute KC firing activity
-	product = m.multiply(d, matrix);
 	debugOut("step3_product", product);
 	
+	
 	// "an additional quantization step is used for discretization"
-	m.quantize(product, o.bucketWidth);
+	mat.quantize(product, o.bucketWidth);
 	debugOut("step4_quantized", product);
+	
+	console.log("product", product);
 	
 	// ------------ step 3 winner take all ------------
 	// start with 0s
-	hashVals = m.matrix(rows, o.kCells, ()=>0);
+	hashVals = mat.matrix(rows, o.kCells, ()=>0);
 	//debugOut("step7-0_hashvals", hashVals);
 	
 	// apply WTA to KCs: firing rates at indices corresponding to top/bot/rand/all KCs; 0s elsewhere.
 	if (o.tagType === "random") {
 		// fix indices for all odors, otherwise, can't compare.
-		randIndices = randomIndices(o.kCells, o.hashLength);
+		randIndices = randomIndices(o.kCells, o.hashLength, rand);
 	}
 	
-	let allInds = [],
-		allVals = [];
+	let allInds = [], allVals = [];
 	
 	for (let r=0; r<rows; r++) {
 		// winner take all
@@ -351,6 +283,7 @@ function hash(data, opts) {
 			case "top":
 				let row = product[r], valsRow = [];
 				indsRow = Object.keys(row).map(Number);
+				// quickselect uses https://en.wikipedia.org/wiki/Floyd-Rivest_algorithm
 				quickselect(indsRow, o.hashLength, null, null, function(ai ,bi) {
 					let a = row[ai], b = row[bi];
 					return a < b ? 1 : a > b ? -1 : 0;
@@ -373,13 +306,3 @@ function hash(data, opts) {
 	
 	return o.debug ? dbgOut : {hashVals: hashVals};
 }
-
-
-module.exports = {
-	hash: hash,
-	setSeed: setSeed,
-	randomIndices: randomIndices,
-	binaryRandomMatrix: binaryRandomMatrix,
-	centerRowMeans: centerRowMeans,
-	normalizeColumnMins: normalizeColumnMins
-};

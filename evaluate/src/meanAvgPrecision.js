@@ -1,19 +1,34 @@
 
-import {randomIndices} from '../../src/index'
+import {randomIndices} from '../../src/utils/random'
 import {l2} from './distanceMetrics'
 
 
-function meanAvgPrecision(data, hashes, _sampleSize, _numNNs) {
+function nns(searchVal, vals, _numNNs, distanceMetric) {
+	let nns = [],
+		numNNs = _numNNs || vals.length,
+		dist = distanceMetric || l2,
+		sortFn = (a, b) => b[0] - a[0]; // todo use k-select or kd-tree
+	
+	for (let j = 0; j < numNNs; j++) {
+		if (searchVal === vals[j]) {continue}
+		nns[j] = [dist(searchVal, vals[j]), j, vals[j]];
+	}
+	
+	return distances.sort(sortFn);
+}
+	
+function meanAvgPrecision(actuals, estimates, _numNNs, _sampleSize, distanceMetric) {
 	let map = [],
-		sampleSize = _sampleSize || data.length,
+		dist = distanceMetric || l2,
+		sampleSize = _sampleSize || actuals.length,
 		numNNs = _numNNs || Math.max(10, Math.round(sampleSize*.02)),
-		indices = randomIndices(data.length, sampleSize),
+		indices = randomIndices(actuals, sampleSize),
 		nnHit = (n, nns) => nns.find(t => t[1] === n[1]),
 		sum = vals => vals.reduce((a, b) => a + b),
 		mean = vals => sum(vals) / vals.length,
 		sortFn = (a, b) => b[0] - a[0];
 	
-	//console.log(data, hashes, sampleSize, numNNs)
+	console.log(actuals.length, estimates.length, sampleSize, numNNs, indices);
 	
 	indices.forEach(i => {
 		let hits = 0,
@@ -25,11 +40,11 @@ function meanAvgPrecision(data, hashes, _sampleSize, _numNNs) {
 		
 		for (let j=0; j<sampleSize; j++) {
 			if (i === j) {continue}
-			iDist = l2(data[i], data[j]);
+			iDist = dist(actuals[i], actuals[j]);
 			if (iDist <= 0) {continue}
-			hDist = l2(hashes[i], hashes[j]);
-			inputDistRow[j] = [iDist, data[j], j];
-			hashDistRow[j] = [hDist, data[j], j];
+			hDist = dist(estimates[i], estimates[j]);
+			inputDistRow[j] = [iDist, actuals[j], j];
+			hashDistRow[j] = [hDist, actuals[j], j];
 		}
 		
 		trueNNs = inputDistRow.sort(sortFn).slice(0, numNNs-1);
@@ -51,5 +66,6 @@ function meanAvgPrecision(data, hashes, _sampleSize, _numNNs) {
 }
 
 module.exports = {
+	nns: nns,
 	meanAvgPrecision: meanAvgPrecision,
 };

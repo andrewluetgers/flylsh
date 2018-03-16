@@ -12,7 +12,8 @@
   "license": "ISC",
   "dependencies": {
     "node-ziggurat": "github:andrewluetgers/node-ziggurat",
-    "quickselect": "^1.0.1"
+    "quickselect": "^1.0.1",
+    "weblas": "^0.9.1"
   },
   "devDependencies": {
     "webpack": "^3.10.0",
